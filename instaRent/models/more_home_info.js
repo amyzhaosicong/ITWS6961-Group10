@@ -5,6 +5,8 @@ var userHelper = require("../methods/userHelper");
 userHelper = new userHelper();
 var Home = require("../models/home").Home;
 var HomeHandler = require("../models/home");
+var mailHandler = require("../methods/mailerHandler");
+var invitationHandler = require("../models/invitation_schema");
 
 var moreHomeInfo = new mongoose.Schema({
   //homeId: String,
@@ -20,6 +22,37 @@ var moreHomeInfo = new mongoose.Schema({
 
 var MoreHomeInfo = mongoose.model('MoreHomeInfo', moreHomeInfo);
 
+//Send emails to fellow tenants and landlord by parsing moreHome object
+function sendInvitationsToUsers(mailer, userType, moreHome) {
+    if(userType == "Tenant") {
+        var tenantEmails = getTenantEmails(moreHome);
+        var homeId;
+        if("_id" in moreHome)
+            homeId = moreHome._id;
+        else
+            homeId = moreHome.homeId;
+
+        for (var i = 0; i < tenantEmails.length; i++) {
+            mailHandler.sendInvitation(mailer, tenantEmails[i], "Tenant", homeId, moreHome.address);
+        }
+        mailHandler.sendInvitation(mailer, moreHome.landlordEmail, "Landlord", homeId, moreHome.address);
+        //HomeHandler.deleteOldUsersFromHome(tenantEmails, homeId);
+        //invitationHandler.deleteOldUsersInvitations(tenantEmails, homeId);
+    }
+}
+
+function getTenantEmails(moreHome) {
+    if(moreHome.tenantsEmails) {
+
+        var tenantEmails = moreHome.tenantsEmails.split(";");
+        for (var i = 0; i < tenantEmails.length; i++) {
+            tenantEmails[i] = tenantEmails[i].trim();
+        }
+        return tenantEmails;
+    }
+    return [];
+}
+
 function checkAndSave(moreHome, req, res, overwrite) {
 	console.log(moreHome);
 	var userId = userHelper.getUserId(req);
@@ -32,31 +65,52 @@ function checkAndSave(moreHome, req, res, overwrite) {
 			res.status(409).send("Error: Home already exists");
 		}
 		else if(data) {
-			//update the record in database
-			MoreHomeInfo.update({address : moreHome.address}, moreHome, {}, function(err, numEffected) {
-				console.log(numEffected);
-				if(err || numEffected == 0) {
-					console.log(err);
-					res.status(409).send("Error: Could not add home");
-				}
-				else {
-					var home = {
-						userId: userId,
-						homeId: data._id,
-						description: req.body.description,
-						userType: req.body.userType
-					}; 
-					HomeHandler.checkAndSave(home, res, true);
-				}
-			});
+			HomeHandler.isHomeAddedToUser(userHelper.getUserId(req), data._id, function (emailId, homeId, err) {
+                if(err)
+                    res.status(409).send("Error: Home already exists");
+                else {
+                    //update the record in database
+                    if(req.body.userType == "Tenant") {
+                        var tenantEmails = getTenantEmails(moreHome);
+                        moreHome.rentPerMonthPerUser = (moreHome.rentPerMonth / (tenantEmails.length + 1)).toFixed(2);
+                    }
+                    MoreHomeInfo.update({address : moreHome.address}, moreHome, {}, function(err, numEffected) {
+                        console.log(numEffected);
+                        if(err || numEffected == 0) {
+                            console.log(err);
+                            res.status(409).send("Error: Could not add home");
+                        }
+                        else {
+                            sendInvitationsToUsers(res.mailer, req.body.userType, data);
+                            var home = {
+                                userId: userId,
+                                homeId: data._id,
+                                description: req.body.description,
+                                userType: req.body.userType
+                            };
+                            HomeHandler.checkAndSave(home, res, true);
+                        }
+                    });
+                }
+            } );
+
 		} 
 		else {
-			moreHome = new MoreHomeInfo(moreHomeInfo);
-			moreHome.save(function(err, moreHome) {
+			moreHome = new MoreHomeInfo(moreHome);
+
+
+            if(req.body.userType == "Tenant")
+            {
+                var tenantEmails = getTenantEmails(moreHome);
+                moreHome.rentPerMonthPerUser = (moreHome.rentPerMonth / (tenantEmails.length + 1)).toFixed(2);
+            }
+
+            moreHome.save(function(err, moreHome) {
 				if(err)
 					res.status(409).send("Error Adding home");
-				else {	
-					var home = {
+				else {
+                    sendInvitationsToUsers(res.mailer, req.body.userType, moreHome);
+                    var home = {
 						userId: userId,
 						homeId: moreHome._id,
 						description: req.body.description,
@@ -71,14 +125,17 @@ function checkAndSave(moreHome, req, res, overwrite) {
 
 function update(home, userId, req, res) {
 	//console.log(home);
-	MoreHomeInfo.update({_id: home.homeId, address : home.address}, home, {}, function(err, numEffected) {
+    var tenantEmails = getTenantEmails(home);
+    home.rentPerMonthPerUser = (home.rentPerMonth / (tenantEmails.length + 1)).toFixed(2);
+    MoreHomeInfo.update({_id: home.homeId, address : home.address}, home, {}, function(err, numEffected) {
 		//console.log(data);
 		if(err || numEffected == 0) {
 			console.log(err);
 			res.status(409).send("Error: Could not find existing home");
 		}
 		else {
-			var moreHomeInfo = {
+            sendInvitationsToUsers(res.mailer,req.body.userType, home);
+            var moreHomeInfo = {
 				userId: userId,
 				address: req.body.address,
 				description: req.body.description,
@@ -179,7 +236,80 @@ function getUserHomeAddresses(userId, res) {
 	});
 };
 
+
+
+function getrentPerMonth(homeId, callback){
+    MoreHomeInfo.findOne({_id:homeId}, function(err, data){
+        //if(err || data.length == 0)
+        // res.status(409).send({status: "Error", response: "Error: No such home!"});
+        if(err)
+            callback(err);
+        else {
+            var rentDueIn = getRentDueIn(data.leaseStartDate, data.leaseEndDate);
+
+            if (rentDueIn.isProRate)
+                data = (data.rentPerMonthPerUser * rentDueIn.daysOfStay).toFixed(2);
+            else
+                data = data.rentPerMonthPerUser;
+
+            callback(null, data);
+        }
+        //res.send({status: "Success", response: data.rentPerMonth});
+    });
+}
+
+function daysInMonth(month,year) {
+    return new Date(year, month, 0).getDate();
+}
+
+function getRentDueIn(leastStartDate, leaseEndDate) {
+    var result = {
+        isProRate: false
+    };
+    var d = new Date();
+    if (d.getMonth() == leastStartDate.getMonth()) {
+        result.isProRate = true;
+        result.rentDueIn = daysInMonth(d.getMonth(), d.getYear()) - leastStartDate.getDate();
+        result.daysOfStay = 1 - (d.getDate() / (daysInMonth(d.getMonth(), d.getYear()) - d.getDate())).toFixed(2);
+    }
+    else if (d.getMonth() == leaseEndDate.getMonth()) {
+        result.isProRate = true;
+        result.rentDueIn = leaseEndDate.getDate() - d.getDate();
+        result.daysOfStay = 1 - (d.getDate() / leaseEndDate.getDate()).toFixed(2);
+    }
+    else {
+        result.rentDueIn = daysInMonth(d.getMonth(), d.getYear()) - d.getDate();
+    }
+    return result;
+}
+
+function daysInMonth(month,year) {
+    return new Date(year, month, 0).getDate();
+}
+
+function getCurrentHomeObject(emailId, res, callback) {
+    userHelper.getDefaultHome(emailId, res, function(err, data) {
+       if(!err && data) {
+           MoreHomeInfo.findById(data, function (err, data) {
+               if(!err && data) {
+                   callback(null, data);
+               }
+               else
+                   callback(err);
+           });
+       }
+       else {
+           callback(err);
+       }
+
+    });
+}
+
 exports.update = update;
 exports.getUserHomeAddresses = getUserHomeAddresses;
 exports.checkAndSave = checkAndSave;
 exports.MoreHomeInfo = MoreHomeInfo;
+exports.getrentPerMonth = getrentPerMonth;
+exports.getCurrentHomeObject = getCurrentHomeObject;
+exports.getRentDueIn = getRentDueIn;
+

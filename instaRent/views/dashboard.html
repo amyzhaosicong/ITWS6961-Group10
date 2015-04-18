@@ -1,0 +1,237 @@
+{% extends 'partials/layout.html' %}
+ 
+{% block myHead %}
+
+    
+    <!-- Bootstrap Core CSS -->
+    <link href="./stylesheets/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Custom CSS -->
+    <link href="./stylesheets/sb-admin.css" rel="stylesheet">
+
+    <!-- Morris Charts CSS -->
+    <link href="./stylesheets/morris.css" rel="stylesheet">
+
+    <!-- Custom Fonts -->
+    <link href="./font-awesome/font-awesome.min.css" rel="stylesheet">
+
+    <!-- HTML5 Shim and Respond.js IE8 support of HTML5 elements and media queries -->
+    <!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
+    <!--[if lt IE 9]>
+        <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+        <script src="https://oss.maxcdn.com/libs/respond.js/1.4.2/respond.min.js"></script>
+    <![endif]-->
+    <script type="text/javascript">
+        function toggle_visibility(id) {
+           var e = document.getElementById(id);
+           if(e.style.display == 'block')
+              e.style.display = 'none';
+           else
+              e.style.display = 'block';
+        }
+        function mdy(todaysdate) {
+            return todaysdate.getMonth()+1+"/"+todaysdate.getDate()
+        }
+    </script>
+
+{% endblock %}
+
+{% block myBody %}
+<!-- This page is for the tenant-->
+        <div id="page-wrapper" class= "Tenant" >
+
+            <div class="container-fluid">
+
+                <!-- Page Heading -->
+                <div class="row">
+                    <div class="col-lg-12">
+                        <h1 class="page-header">
+                             {{ userName }}   Welcome back!
+                            <!--to distinguish the landlord and renter-->
+                        </h1>
+                        <ol class="breadcrumb">
+                            <li class="active">
+                                <i class="fa fa-dashboard"></i>
+                                <script language="JavaScript">
+                                    sampleDate1=new Date()
+                                    document.write ("Today's date is "+ mdy(sampleDate1))
+                                </script>
+                                <!--show the date-->
+                            </li>
+                        </ol>
+                    </div>
+                </div>
+                <!-- /.row -->
+
+                
+                <!-- /.row -->
+
+                <div class="row">
+                    <div class="col-lg-3 col-md-6">
+                        <div class="panel panel-primary">
+                            <div class="panel-heading">
+                                <div class="row">
+                                    <div class="col-xs-3">
+                                        <i class="fa fa-comments fa-5x"></i>
+                                    </div>
+                                    <div class="col-xs-9 text-right" >
+                                        <div class="huge" >
+                                            <small>
+                                                <!--Here didn't tell the difference between two roles, need fix-->
+                                                {% if userRole == 'Tenant'%}
+                                                    {{ activeComplaints }} 
+                                                {% elseif userRole == 'Landlord'%}
+                                                    {{ activeComplaints }} 
+                                                {% endif %}
+
+                                            </small>
+                                        </div>
+                                        <div>New Complaints!</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <a href="#" onclick="toggle_visibility('ActiveComplaintsForTenant');">
+                                <div class="panel-footer">
+                                    <span class="pull-left">View Details</span>
+                                    <span class="pull-right"><i class="fa fa-arrow-circle-right" id = "show_ActiveCom"></i>
+                                        <!--Complaints-->
+                                        <!--Show the complaints? Not included in the json file-->
+                                        <p id = "ActiveComplaintsForTenant" style="display:none;">
+                                            Roof is leaking
+                                        </p></span>
+                                    <div class="clearfix"></div>
+                                </div>
+                            </a>
+                        </div>
+                    </div>
+                    <div class="col-lg-3 col-md-6">
+                        <div class="panel panel-green">
+                            <div class="panel-heading">
+                                <div class="row">
+                                    <div class="col-xs-3">
+                                        <i class="fa fa-tasks fa-5x"></i>
+                                    </div>
+                                    <div class="col-xs-9 text-right">
+                                        <div class="huge" >
+                                            <small>
+                                                <!--Here didn't tell the difference between two roles, need fix-->
+                                                {% if userRole == 'Tenant'%}
+                                                     {{ rentDue }} 
+                                                {% elseif userRole == 'Landlord'%}
+                                                     {{ rentDue }}
+                                                {% endif %}
+                                                
+                                            </small>
+                                        </div>
+                                        <div>Rent fees</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <a href="#">
+                                <div class="panel-footer">
+                                    <span class="pull-left">Go to Payments</span>
+                                    <span class="pull-right"><i class="fa fa-arrow-circle-right" ></i>
+                                        <!--Rents-->
+                                        
+                                        <p id = "Rents" style="display:none;"></p>
+                                    </span>
+                                    <div class="clearfix"></div>
+                                </div>
+                            </a>
+                        </div>
+                    </div>
+                    <div class="col-lg-3 col-md-6">
+                        <div class="panel panel-yellow">
+                            <div class="panel-heading">
+                                <div class="row">
+                                    <div class="col-xs-3">
+                                        <i class="fa fa-shopping-cart fa-5x"></i>
+                                    </div>
+                                    <div class="col-xs-9 text-right">
+                                        <div class="huge" >
+                                            <small>
+                                                {% if userRole == 'Tenant'%}
+                                                    {{rentDueIn}}  Days
+                                                {% elseif userRole == 'Landlord'%}
+                                                    {{rentToBePaid}} not paid
+                                                {% endif %}
+                                            </small>
+                                        </div>
+                                        <div>
+                                            {% if userRole == 'Tenant'%}
+                                                Days to pay
+                                            {% elseif userRole == 'Landlord'%}
+                                                Rent Status
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <a href="#" onclick="toggle_visibility('DueDay');">
+                                <div class="panel-footer">
+                                    <span class="pull-left">View Details</span>
+                                    <span class="pull-right"><i class="fa fa-arrow-circle-right" id = "show_Dueday"></i>
+                                        <!--Due day-->
+                                        <p id = "DueDay" style="display:none;">
+                                            {% if userRole == 'Landlord'%}
+                                                {% for x in rentStatus %}
+                                                    {% if loop.first %}<ul>{% endif %}
+                                                    Name: {{ x.name }}</br>
+                                                    Paid Day: {{ x.rentPaidOn }}
+                                                    {% if loop.last %}</ul>{% endif %}
+                                                {% endfor %}
+                                            {% endif %}
+                                        </p>
+                                    </span>
+                                    <div class="clearfix"></div>
+                                </div>
+                            </a>
+                        </div>
+                    </div>
+                    <div class="col-lg-3 col-md-6">
+                        <div class="panel panel-red">
+                            <div class="panel-heading">
+                                <div class="row">
+                                    <div class="col-xs-3">
+                                        <i class="fa fa-support fa-5x"></i>
+                                    </div>
+                                    <div class="col-xs-9 text-right">
+                                        <div class="huge">Info</div>
+                                        <div>Contact Info!</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <a href="#" onclick="toggle_visibility('LandlordInfo');">
+                                <div class="panel-footer">
+                                    <span class="pull-left">View Details</span>
+                                    <span class="pull-right"><i class="fa fa-arrow-circle-right" id = "show_Landlord"></i>
+                                        <!--Landlord info include ="name" + "email"-->
+                                        <p id = "LandlordInfo" style="display:none;">
+                                            {% if userRole == 'Tenant'%}
+                                                    Name: {{landlord.name}}</br>
+                                                    Email: {{landlord.email}}</br>
+                                                    Tel: {{landlord.phone}}
+                                                {% elseif userRole == 'Landlord'%}
+                                                    {% for x in rents %}
+                                                        {% if loop.first %}<ul>{% endif %}
+                                                        Name: {{ x.name }}</br>
+                                                        Email: {{ x.email }}</br>
+                                                        Tel: {{x.phone}}
+                                                        {% if loop.last %}</ul>{% endif %}
+                                                    {% endfor %}
+                                                {% endif %}
+                                            
+                                        </p>
+                                    </span>
+                                    <div class="clearfix"></div>
+                                </div>
+
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <!-- /.row -->
+            </div>
+            <!-- /.container-fluid -->
+        </div>
+{% endblock %}

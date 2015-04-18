@@ -2,7 +2,7 @@ var mongoose = require("./mongoose_connector").mongoose;
 var db = require("./mongoose_connector").db;
 var uuid = require('node-uuid');
 var Schema = mongoose.Schema;
-var userModel = require("./user");
+var userModel = require("./user").User;
 
 // Verification token model
 var verificationTokenSchema = new Schema({
@@ -32,7 +32,7 @@ exports.verifyUser = function(token, done) {
             if (err)
             {
             	console.log(err);
-            	return done(err);
+            	done(err);
             } 
             user.isVerified = true;
             
@@ -43,6 +43,32 @@ exports.verifyUser = function(token, done) {
         })
     })
 };
+
+exports.verifyEmail=function(token, email, done){
+    VerificationTokenModel.findOne({token: token}, function (err, rec){
+        if (err) 
+        { console.log("token find error");
+          done(err);
+        }
+        userModel.findOne({email: rec._userId}, function (err, user) {
+            if (err)
+            {   console.log("email not found in db error findOne");
+            	console.log(err);
+            	done(err);
+            } 
+        if(user){
+            console.log("email found in db: "+rec._userId);
+            return done();
+        }
+        else
+        {   console.log("email not found in db");
+            done(null);
+        }
+        });
+
+
+  });
+}
 
 var VerificationTokenModel = mongoose.model('VerificationToken', verificationTokenSchema);
 exports.verificationTokenModel = VerificationTokenModel;
